@@ -22,10 +22,10 @@ func NewWriter(ctx context.Context, w io.Writer) *Writer {
 }
 
 // ApplyLimits set writing limit to bytePerSec bytes per second
-func (th *Writer) ApplyLimits(limiters ...*rate.Limiter) {
+func (th *Writer) ApplyLimits(limiters ...*Limiter) {
 	for _, l := range limiters {
 		l.AllowN(time.Now(), int(l.Limit())) // initialize a bucket with initial amount of tokens
-		th.limiters = append(th.limiters, l)
+		th.limiters = append(th.limiters, l.Limiter)
 	}
 }
 
