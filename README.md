@@ -7,7 +7,12 @@ package main
  
  import "github.com/slavash/throt"
  
+ // in the server start
+ // set bandwidth limit per server
+ globalLimiter := throt.NewLimiter(globalRateLimit)
+
  ...
+ // in connection handler
  
  fd, err := os.Open(fileName)
  
@@ -16,9 +21,8 @@ package main
  }
  
  // set bandwidth limit per connection
- connLimiter := rate.NewLimiter(rate.Limit(rateLimit), int(rateLimit))
- // set bandwidth limit per server
- globalLimiter := ctx.Value("rateLimit").(*rate.Limiter)
+ connLimiter := throt.NewLimiter(connRateLimit)
+
  
  reader := throt.NewReader(ctx, fd)
  reader.ApplyLimits(connLimiter, globalLimiter)
