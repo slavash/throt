@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	exitCmd = "exit"
+	exitCmd          = "exit"
+	defaultConnLimit = 196500
 )
 
 var (
@@ -25,7 +26,7 @@ var (
 
 func main() {
 
-	connLimit = 196500 // byte/sec
+	connLimit = defaultConnLimit // byte/sec
 
 	// set bandwidth limit per server
 	globalLimiter = throt.NewLimiter(393000)
@@ -91,8 +92,8 @@ func handleConnection(ctx context.Context, c net.Conn) {
 				fmt.Printf("invalid limit value: %s [%s]\n", err, cmd)
 				_, _ = fmt.Fprintf(c, "invalid limit value: %s [%s]\n", err, cmd)
 			}
-			if connLimit == 0 {
-				limit = connLimit
+			if limit == 0 {
+				limit = defaultConnLimit
 			}
 
 			atomic.StoreInt64(&connLimit, limit)
@@ -127,9 +128,13 @@ func serveFile(ctx context.Context, c net.Conn, name string) error {
 	// set bandwidth limit per connection
 	connLimiter := throt.NewLimiter(connLimit)
 
-	reader := throt.NewReader(ctx, fd)
-	reader.ApplyLimits(connLimiter, globalLimiter)
-	sent, err = io.Copy(c, reader)
+	r1 := throt.NewReader(ctx, fd)
+	r1.ApplyLimits(connLimiter)
+
+	r2 := throt.NewReader(ctx, r1)
+	r2.ApplyLimits(globalLimiter)
+
+	sent, err = io.Copy(c, r2)
 
 	// The same may be done with writer:
 	//writer := throt.NewWriter(ctx, c)
