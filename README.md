@@ -1,5 +1,5 @@
 # throt
-Golang IO throttling 
+Golang IO throttling with multiple limiters
 
 Usage:
 ```go
