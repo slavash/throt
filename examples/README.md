@@ -14,7 +14,7 @@ Run client:
 ```bash
 echo "get file.exe" | nc localhost 7777 > /dev/null
 ```
-assuming the file.exe exists in the local directory
+assuming the file.exe exists in the local directory (no security!)
 
 Change limit (bytes/s):
 ```bash
