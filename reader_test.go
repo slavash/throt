@@ -4,10 +4,12 @@ import (
 	"context"
 	"golang.org/x/time/rate"
 	"io"
+	"reflect"
 	"testing"
 	"time"
 )
 
+// TODO Add tests...
 type ReaderMock struct {
 }
 
@@ -86,6 +88,54 @@ func TestReader_Read(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("Read() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNewReader(t *testing.T) {
+	type args struct {
+		ctx context.Context
+		r   io.Reader
+	}
+	tests := []struct {
+		name string
+		args args
+		want *Reader
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewReader(tt.args.ctx, tt.args.r); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewReader() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReader_ApplyLimit(t *testing.T) {
+	type fields struct {
+		ctx     context.Context
+		r       io.Reader
+		limiter *rate.Limiter
+	}
+	type args struct {
+		l *Limiter
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_ = &Reader{
+				ctx:     tt.fields.ctx,
+				r:       tt.fields.r,
+				limiter: tt.fields.limiter,
 			}
 		})
 	}
