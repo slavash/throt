@@ -4,14 +4,16 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"github.com/slavash/throt"
 	"io"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"github.com/slavash/throt"
 )
 
 // **********************************************************************
@@ -65,6 +67,7 @@ func main() {
 			fmt.Println(err)
 			return
 		}
+
 		go handleConnection(ctx, c)
 	}
 }
@@ -75,8 +78,6 @@ func handleConnection(ctx context.Context, c net.Conn) {
 			fmt.Printf("faield to close connection: %s\n", e)
 		}
 	}()
-	// set bandwidth limit per connection
-	connLimiter := throt.NewLimiter(int(connLimit), burst)
 
 	fmt.Printf("client connected from %s\n", c.RemoteAddr().String())
 	for {
@@ -106,14 +107,14 @@ func handleConnection(ctx context.Context, c net.Conn) {
 				limit = defaultConnLimit
 			}
 
-			setConnectionLimit(limit, connLimiter)
+			setConnectionLimit(limit)
 
 			fmt.Printf("Rate limit changed to %d\n", limit)
 		}
 
 		if len(cmd) > 4 && cmd[:3] == "get" {
 			fileName := cmd[4:]
-			err := serveFile(ctx, c, fileName, connLimiter)
+			err := serveFile(ctx, c, fileName)
 			if err != nil {
 				fmt.Printf("failed to serve data: %s\n", err)
 				_, _ = fmt.Fprintf(c, "failed to serve data: %s\n", err)
@@ -122,15 +123,11 @@ func handleConnection(ctx context.Context, c net.Conn) {
 	}
 }
 
-func setConnectionLimit(limit int, connLimiter *throt.Limiter) {
-	mutex.Lock()
-	connLimit = int64(limit)
-	// set bandwidth limit per connection
-	connLimiter = throt.NewLimiter(int(connLimit), burst)
-	mutex.Unlock()
+func setConnectionLimit(limit int) {
+	atomic.StoreInt64(&connLimit, int64(limit))
 }
 
-func serveFile(ctx context.Context, c net.Conn, name string, connLimiter *throt.Limiter) error {
+func serveFile(ctx context.Context, c net.Conn, name string) error {
 
 	var sent int64
 	defer func(start time.Time) {
@@ -141,6 +138,9 @@ func serveFile(ctx context.Context, c net.Conn, name string, connLimiter *throt.
 	if err != nil {
 		return err
 	}
+
+	// set bandwidth limit per connection
+	connLimiter := throt.NewLimiter(int(connLimit), burst)
 
 	r1 := throt.NewReader(ctx, fd)
 	r1.ApplyLimit(connLimiter)
