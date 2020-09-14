@@ -7,13 +7,11 @@ package main
  
  import "github.com/slavash/throt"
  
- // in the server start
  // set bandwidth limit per server
- globalLimiter := throt.NewLimiter(globalRateLimit)
+ globalLimiter := throt.NewLimiter(globalRateLimit, burst)
 
  ...
- // in connection handler
- 
+ // connection handler - serving the file
  fd, err := os.Open(fileName)
  
  if err != nil {
@@ -21,22 +19,19 @@ package main
  }
  
  // set bandwidth limit per connection
- connLimiter := throt.NewLimiter(connRateLimit)
-
- 
- reader := throt.NewReader(ctx, fd)
- reader.ApplyLimits(connLimiter, globalLimiter)
- sent, err = io.Copy(c, reader)
- 
+ connLimiter := throt.NewLimiter(int(connLimit), burst)
  ...
- 
- // The same may be done with writer:
- 
- writer := throt.NewWriter(ctx, c)
- writer.ApplyLimits(connLimiter, globalLimiter)
- sent, err = io.Copy(writer, fd)
- 
- sent, err = io.Copy(c, reader)
 
+ // decorating the reader
+ r1 := throt.NewReader(ctx, fd)
+ r1.ApplyLimits(connLimiter)
+
+ // decorating the reader again...
+ r2 = throt.NewReader(ctx, r1)
+ r2.ApplyLimits(globalLimiter)
+
+ sent, err = io.Copy(c, r2)
+ 
+ // The same may be done with io.Writer
  ...
 ```
