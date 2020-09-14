@@ -1,5 +1,5 @@
 # throt
-Golang IO throttling 
+Golang IO throttling example
 
 Usage:
 ```go
