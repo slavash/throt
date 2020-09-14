@@ -10,18 +10,25 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 )
 
+// **********************************************************************
+// THIS IS STRAIGHTFORWARD IMPLEMENTATION TO DEMONSTRATE THE LIBRARY ONLY
+// PLEASE DON'T CONSIDER IT AS A CODE EXAMPLE
+// **********************************************************************
+
 const (
 	exitCmd          = "exit"
-	defaultConnLimit = 196500
+	defaultConnLimit = (980933 - burst) / 3 // I want to download my file (size: 980933) in 3 sec
+	burst            = 32 * 1024            // using default io.Copy buffer size as the allowed burst
 )
 
 var (
 	connLimit     int64
 	globalLimiter *throt.Limiter
+	mutex         = &sync.Mutex{}
 )
 
 func main() {
@@ -29,7 +36,7 @@ func main() {
 	connLimit = defaultConnLimit // byte/sec
 
 	// set bandwidth limit per server
-	globalLimiter = throt.NewLimiter(393000)
+	globalLimiter = throt.NewLimiter(980933, burst)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -68,6 +75,8 @@ func handleConnection(ctx context.Context, c net.Conn) {
 			fmt.Printf("faield to close connection: %s\n", e)
 		}
 	}()
+	// set bandwidth limit per connection
+	connLimiter := throt.NewLimiter(int(connLimit), burst)
 
 	fmt.Printf("client connected from %s\n", c.RemoteAddr().String())
 	for {
@@ -85,26 +94,26 @@ func handleConnection(ctx context.Context, c net.Conn) {
 			break
 		}
 
-		// changing limits in runtime (applies to all existing connections)
+		// example of changing limits in runtime (applies to all existing connections)
 		if len(cmd) > 5 && cmd[:4] == "setl" {
-			limit, err := strconv.ParseInt(cmd[5:], 10, 32)
+			limit, err := strconv.Atoi(cmd[5:])
 			if err != nil {
-				fmt.Printf("invalid limit value: %s [%s]\n", err, cmd)
-				_, _ = fmt.Fprintf(c, "invalid limit value: %s [%s]\n", err, cmd)
+				fmt.Printf("invalid limit value: %s\n", cmd[5:])
+				_, _ = fmt.Fprintf(c, "invalid limit value: %s\n", cmd[5:])
+				continue
 			}
 			if limit == 0 {
 				limit = defaultConnLimit
 			}
 
-			atomic.StoreInt64(&connLimit, limit)
+			setConnectionLimit(limit, connLimiter)
 
 			fmt.Printf("Rate limit changed to %d\n", limit)
-			_, _ = fmt.Fprintf(c, "Rate limit changed to %d\n", limit)
 		}
 
 		if len(cmd) > 4 && cmd[:3] == "get" {
 			fileName := cmd[4:]
-			err := serveFile(ctx, c, fileName)
+			err := serveFile(ctx, c, fileName, connLimiter)
 			if err != nil {
 				fmt.Printf("failed to serve data: %s\n", err)
 				_, _ = fmt.Fprintf(c, "failed to serve data: %s\n", err)
@@ -113,11 +122,19 @@ func handleConnection(ctx context.Context, c net.Conn) {
 	}
 }
 
-func serveFile(ctx context.Context, c net.Conn, name string) error {
+func setConnectionLimit(limit int, connLimiter *throt.Limiter) {
+	mutex.Lock()
+	connLimit = int64(limit)
+	// set bandwidth limit per connection
+	connLimiter = throt.NewLimiter(int(connLimit), burst)
+	mutex.Unlock()
+}
+
+func serveFile(ctx context.Context, c net.Conn, name string, connLimiter *throt.Limiter) error {
 
 	var sent int64
 	defer func(start time.Time) {
-		fmt.Printf("Sent %d bytes in %03fs\n", sent, time.Since(start).Seconds())
+		fmt.Printf("Sent %d bytes in %.3fs\n", sent, time.Since(start).Seconds())
 	}(time.Now())
 
 	fd, err := os.Open(name)
@@ -125,20 +142,17 @@ func serveFile(ctx context.Context, c net.Conn, name string) error {
 		return err
 	}
 
-	// set bandwidth limit per connection
-	connLimiter := throt.NewLimiter(connLimit)
-
 	r1 := throt.NewReader(ctx, fd)
-	r1.ApplyLimits(connLimiter)
+	r1.ApplyLimit(connLimiter)
 
 	r2 := throt.NewReader(ctx, r1)
-	r2.ApplyLimits(globalLimiter)
+	r2.ApplyLimit(globalLimiter)
 
 	sent, err = io.Copy(c, r2)
 
 	// The same may be done with writer:
 	//writer := throt.NewWriter(ctx, c)
-	//writer.ApplyLimits(connLimiter, globalLimiter)
+	//writer.ApplyLimit(connLimiter, globalLimiter)
 	//sent, err = io.Copy(writer, fd)
 
 	if err != nil {

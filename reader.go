@@ -21,11 +21,9 @@ func NewReader(ctx context.Context, r io.Reader) *Reader {
 	}
 }
 
-// ApplyLimits set reading limit to bytePerSec bytes per second
-func (th *Reader) ApplyLimits(l *Limiter) {
-	//l.AllowN(time.Now(), int(l.Limit())) // initialize a bucket with initial amount of tokens
+// ApplyLimit set reading limit to bytePerSec bytes per second
+func (th *Reader) ApplyLimit(l *Limiter) {
 	th.limiter = l.Limiter
-
 }
 
 // Read wrap reading with rate limitation
