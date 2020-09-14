@@ -1,41 +1,37 @@
 # throt
-Golang IO throttling with multiple limiters
+Golang IO throttling 
 
 Usage:
 ```go
 package main
+ 
+ import "github.com/slavash/throt"
+ 
+ // set bandwidth limit per server
+ globalLimiter := throt.NewLimiter(globalRateLimit, burst)
 
-import "github.com/slavash/throt"
+ ...
+ // connection handler - serving the file
+ fd, err := os.Open(fileName)
+ 
+ if err != nil {
+     return err
+ }
+ 
+ // set bandwidth limit per connection
+ connLimiter := throt.NewLimiter(int(connLimit), burst)
+ ...
 
-// in the server start
-// set bandwidth limit per server
-globalLimiter := throt.NewLimiter(globalRateLimit)
+ // decorating the reader
+ r1 := throt.NewReader(ctx, fd)
+ r1.ApplyLimits(connLimiter)
 
-...
-// in connection handler
+ // decorating the reader again...
+ r2 = throt.NewReader(ctx, r1)
+ r2.ApplyLimits(globalLimiter)
 
-fd, err := os.Open(fileName)
-
-if err != nil {
-    return err
-}
-
-// set bandwidth limit per connection
-connLimiter := throt.NewLimiter(connRateLimit)
-
-
-reader := throt.NewReader(ctx, fd)
-reader.ApplyLimits(connLimiter, globalLimiter)
-
-sent, err = io.Copy(c, reader)
-
-...
-
-// The same may be done with writer:
-writer := throt.NewWriter(ctx, c)
-writer.ApplyLimits(connLimiter, globalLimiter)
-
-sent, err = io.Copy(writer, fd)
-
-...
+ sent, err = io.Copy(c, r2)
+ 
+ // The same may be done with io.Writer
+ ...
 ```
