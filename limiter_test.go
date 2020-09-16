@@ -1,9 +1,10 @@
 package throt
 
 import (
-	"golang.org/x/time/rate"
 	"reflect"
 	"testing"
+
+	"golang.org/x/time/rate"
 )
 
 func TestNewLimiter(t *testing.T) {

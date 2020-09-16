@@ -3,10 +3,11 @@ package throt
 import (
 	"bytes"
 	"context"
-	"golang.org/x/time/rate"
 	"io"
 	"reflect"
 	"testing"
+
+	"golang.org/x/time/rate"
 )
 
 // TODO Add tests...

@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -30,7 +29,6 @@ const (
 var (
 	connLimit     int64
 	globalLimiter *throt.Limiter
-	mutex         = &sync.Mutex{}
 )
 
 func main() {
@@ -127,7 +125,7 @@ func setConnectionLimit(limit int) {
 	atomic.StoreInt64(&connLimit, int64(limit))
 }
 
-func serveFile(ctx context.Context, c net.Conn, name string) error {
+func serveFile(ctx context.Context, c io.Writer, name string) error {
 
 	var sent int64
 	defer func(start time.Time) {

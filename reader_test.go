@@ -3,12 +3,13 @@ package throt
 import (
 	"context"
 	"errors"
-	"github.com/stretchr/testify/assert"
-	"golang.org/x/time/rate"
 	"io"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"golang.org/x/time/rate"
 )
 
 type ReaderMock struct {
